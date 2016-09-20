@@ -80,4 +80,3 @@ function on_quit()
 		remove_content(k)
 	end	
 end
-
