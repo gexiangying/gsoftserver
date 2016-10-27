@@ -1,7 +1,107 @@
+package.cpath = "./?53.dll;./?.dll"
+require "ado" 
+local config = require("config")
 local cs = {}
 local cmds = {}
+tasklist = {}
+local user = {}
 
-hub_start("localhost",25,10,60) --ip port max_accept max_accept_seconds
+hub_start("localhost",config.port,10,60) --ip port max_accept max_accept_seconds
+local db
+local function open_db(server,database,uid,pwd)
+	local db_string = string.format("Provider=SQLOLEDB;Server=%s;Database=%s;uid=%s;pwd=%s",server,database,uid,pwd)
+	--local db_string = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=test.mdb"
+	--db:connect(db_string)
+	db = ADO_Open(db_string)
+end
+
+
+local function insertdata(tb,username,ip,startdatetime,enddatetime,totaltimes,appname)
+	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "')"
+	db:exec(str)
+	local f = io.open("sql.txt","a")
+	f:write(str .. "\n")
+	f:close()
+end
+
+local function fmt_data(datetime)
+	return os.date("%Y-%m-%d %X",datetime)
+end
+
+local function log(f,exename,ip,starttime,endtime)
+	exename = string.format("%-32s",exename)
+	f:write(exename .. "\t" .. ip .. "\t" .. os.date("%Y-%m-%d %X",starttime) .. "\t" .. os.date("%Y-%m-%d %X",endtime) .. "\r\n")
+end
+
+local function trigger(ip,delay)
+	local f 
+	local t = tasklist[ip]
+
+  local log_sql = false
+	local log_file = false
+
+	for k,v in pairs(t) do
+		local seconds = v.cur - v.start
+		local period = os.time() - v.cur
+		if period > delay then
+			if config.log_file then
+				if not log_file then
+					f = io.open("log.txt","a")
+					log_file = true
+				end
+				log(f,k,ip,v.start,v.cur)
+			end
+
+			if config.log_sql then
+				if not log_sql then
+					open_db(config.server,config.database,config.uid,config.pwd)
+					log_sql = true
+				end
+				insertdata(config.tb,user[ip] or ip,ip,fmt_data(v.start),fmt_data(v.cur),seconds,k)
+			end
+
+			if config.trace then
+				trace_out("\n*********************************************************************\n")
+				trace_out(k .. "@" .. (user[ip] or ip ).. "::"  .. os.date("%x %X",v.start) .. "-----" .. os.date("%x %X",v.cur) .. "\n")
+				trace_out("*********************************************************************\n\n")
+			end
+			t[k] = nil
+		elseif config.trace then
+			trace_out(k .. "@" .. (user[ip] or ip) .. "::" .. os.date("%x %X",v.start) .. "-----" .. seconds .. " seconds\n")
+		end
+	end
+	if log_file then
+		f:close()
+	end
+	if log_sql then
+		db:close()	
+	end
+end
+
+
+function cmds.whoami(content,line)
+  local domain_name,name = string.match(line,"(.*)\\(%w+)")
+	local ip = hub_addr(content)
+	user[ip] = name
+	if config.trace then
+		trace_out("domain_name:" .. domain_name .. " user: " .. name .. "\n")
+	end
+end
+
+function cmds.systeminfo(content,line)
+	trace_out(line)
+end
+
+function cmds.tasklist(content,line)
+	trace_out("cmd :tasklist \n")
+	local ip = hub_addr(content)
+	tasklist[ip] = tasklist[ip] or {}
+	for exename in string.gmatch(line,"(%w+).exe") do
+		tasklist[ip][exename] = tasklist[ip][exename] or {start = os.time() } 
+		tasklist[ip][exename].cur = os.time()
+	end
+	trigger(ip,config.delay)
+end
 
 function process_cmd_imp(content,line)
 	local fun,l = string.match(line,"([^\r\n]-)\r\n(.*)")
@@ -72,6 +172,7 @@ function socket_quit(content)
 	ip,port = hub_addr(content)
 	local exittime = os.date("%x %X")
 	trace_out("client exit @" .. ip .. ":" .. port .. "---" .. exittime .. "\n")
+	trigger(ip,0)
 	cs[content] = nil
 end
 
