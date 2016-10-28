@@ -16,21 +16,21 @@ local function open_db(server,database,uid,pwd)
 end
 
 
-local function insertdata(tb,username,ip,startdatetime,enddatetime,totaltimes,appname)
-	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "')"
-	db:exec(str)
+local function insertdata(tb,username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle)
+	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "','" .. apptitle .. "')"
 	local f = io.open("sql.txt","a")
 	f:write(str .. "\n")
 	f:close()
+--	db:exec(str)
 end
 
 local function fmt_data(datetime)
 	return os.date("%Y-%m-%d %X",datetime)
 end
 
-local function log(f,exename,ip,starttime,endtime)
+local function log(f,exename,ip,starttime,endtime,title)
 	exename = string.format("%-32s",exename)
-	f:write(exename .. "\t" .. ip .. "\t" .. os.date("%Y-%m-%d %X",starttime) .. "\t" .. os.date("%Y-%m-%d %X",endtime) .. "\r\n")
+	f:write(exename .. "\t" .. title .. "\t" .. ip .. "\t" .. os.date("%Y-%m-%d %X",starttime) .. "\t" .. os.date("%Y-%m-%d %X",endtime) .. "\r\n")
 end
 
 local function trigger(ip,delay)
@@ -49,7 +49,7 @@ local function trigger(ip,delay)
 					f = io.open("log.txt","a")
 					log_file = true
 				end
-				log(f,k,ip,v.start,v.cur)
+				log(f,v.exe,ip,v.start,v.cur,v.title)
 			end
 
 			if config.log_sql then
@@ -57,17 +57,17 @@ local function trigger(ip,delay)
 					open_db(config.server,config.database,config.uid,config.pwd)
 					log_sql = true
 				end
-				insertdata(config.tb,user[ip] or ip,ip,fmt_data(v.start),fmt_data(v.cur),seconds,k)
+				insertdata(config.tb,user[ip] or ip,ip,fmt_data(v.start),fmt_data(v.cur),seconds,v.exe,v.title)
 			end
 
 			if config.trace then
 				trace_out("\n*********************************************************************\n")
-				trace_out(k .. "@" .. (user[ip] or ip ).. "::"  .. os.date("%x %X",v.start) .. "-----" .. os.date("%x %X",v.cur) .. "\n")
+				trace_out(v.exe .. "@" .. (user[ip] or ip ).. "::"  .. os.date("%x %X",v.start) .. "-----" .. os.date("%x %X",v.cur) .. "\n")
 				trace_out("*********************************************************************\n\n")
 			end
 			t[k] = nil
 		elseif config.trace then
-			trace_out(k .. "@" .. (user[ip] or ip) .. "::" .. os.date("%x %X",v.start) .. "-----" .. seconds .. " seconds\n")
+			trace_out(v.exe .. "(" .. v.title .. ")" .. "@" .. (user[ip] or ip) .. "::" .. os.date("%x %X",v.start) .. "-----" .. seconds .. " seconds\n")
 		end
 	end
 	if log_file then
@@ -96,11 +96,31 @@ function cmds.tasklist(content,line)
 	trace_out("cmd :tasklist \n")
 	local ip = hub_addr(content)
 	tasklist[ip] = tasklist[ip] or {}
+	for l in string.gmatch(line,"(.-\n)") do
+		--trace_out(l)
+		local t = {}
+		local index = 1
+		for data in string.gmatch(l,"%b\"\"") do
+			t[index] = string.gsub(data,"\"","")
+			--trace_out(t[index] .. "\t")
+			index = index + 1
+		end
+		if index > 9 then
+			local name = t[1] .. t[9]
+			tasklist[ip][name] = tasklist[ip][name] or {start = os.time() } 
+			tasklist[ip][name].cur = os.time()
+			tasklist[ip][name].title = t[9]
+			tasklist[ip][name].exe = t[1]
+		end
+	end
+	trigger(ip,config.delay)
+	--[[
 	for exename in string.gmatch(line,"(%w+).exe") do
 		tasklist[ip][exename] = tasklist[ip][exename] or {start = os.time() } 
 		tasklist[ip][exename].cur = os.time()
 	end
 	trigger(ip,config.delay)
+	--]]
 end
 
 function process_cmd_imp(content,line)

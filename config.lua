@@ -11,6 +11,6 @@ local M = {
 	log_file = true,
 	log_sql = false, 
 	trace = true, 
-	delay = 600,
+	delay = 6,
 }
 package.loaded[modename] = M
