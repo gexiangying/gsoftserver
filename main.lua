@@ -1,5 +1,6 @@
 package.cpath = "./?53.dll;./?.dll"
 require "ado" 
+local luaext = require("luaext")
 local config = require("config")
 local cs = {}
 local cmds = {}
@@ -17,11 +18,12 @@ end
 
 
 local function insertdata(tb,username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle)
-	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "','" .. apptitle .. "')"
+	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "',N'" .. apptitle .. "')"
 	local f = io.open("sql.txt","a")
 	f:write(str .. "\n")
 	f:close()
---	db:exec(str)
+	str = luaext.a2u8(str)
+	db:exec(str)
 end
 
 local function fmt_data(datetime)
