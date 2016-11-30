@@ -37,7 +37,7 @@ end
 
 local function trigger(ip,delay)
 	local f 
-	local t = tasklist[ip]
+	local t = tasklist[ip] or {}
 
   local log_sql = false
 	local log_file = false
@@ -47,7 +47,7 @@ local function trigger(ip,delay)
 		local period = os.time() - v.cur
 		if period > delay then
 			if config.log_file then
-				if not log_file then
+				if not log_file or not f then
 					f = io.open("log.txt","a")
 					log_file = true
 				end
@@ -94,6 +94,21 @@ function cmds.systeminfo(content,line)
 	trace_out(line)
 end
 
+function fix(t1,t9)
+	for i,v in ipairs(config.ignore) do
+		if t1 == v then
+			return nil,nil
+		end
+	end
+	for i,v in ipairs(config.titles) do
+		if string.find(t9,v) then
+			t9 = v
+			break
+		end
+	end
+  return t1,t9
+end
+
 function cmds.tasklist(content,line)
 	trace_out("cmd :tasklist \n")
 	local ip = hub_addr(content)
@@ -108,11 +123,14 @@ function cmds.tasklist(content,line)
 			index = index + 1
 		end
 		if index > 9 then
-			local name = t[1] .. t[9]
-			tasklist[ip][name] = tasklist[ip][name] or {start = os.time() } 
-			tasklist[ip][name].cur = os.time()
-			tasklist[ip][name].title = t[9]
-			tasklist[ip][name].exe = t[1]
+			t[1],t[9] = fix(t[1],t[9])
+			if t[1] and t[9] then
+				local name = t[1] .. t[9]
+				tasklist[ip][name] = tasklist[ip][name] or {start = os.time() } 
+				tasklist[ip][name].cur = os.time()
+				tasklist[ip][name].title = t[9]
+				tasklist[ip][name].exe = t[1]
+			end
 		end
 	end
 	trigger(ip,config.delay)

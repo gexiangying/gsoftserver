@@ -12,5 +12,7 @@ local M = {
 	log_sql = false, 
 	trace = true, 
 	delay = 6,
+	ignore = {"lsass.exe","tasklist.exe","taskhost.exe","dwm.exe","gsoft.exe","dllhost.exe","smss.exe"},
+	titles = {"TeamViewer","SSDD","微信"},
 }
 package.loaded[modename] = M
