@@ -35,9 +35,9 @@ local function log(f,exename,ip,starttime,endtime,title)
 	f:write(exename .. "\t" .. title .. "\t" .. ip .. "\t" .. os.date("%Y-%m-%d %X",starttime) .. "\t" .. os.date("%Y-%m-%d %X",endtime) .. "\r\n")
 end
 
-local function trigger(ip,delay)
+local function trigger(uip,ip,delay)
 	local f 
-	local t = tasklist[ip] or {}
+	local t = tasklist[uip] or {}
 
   local log_sql = false
 	local log_file = false
@@ -112,7 +112,10 @@ end
 function cmds.tasklist(content,line)
 	trace_out("cmd :tasklist \n")
 	local ip = hub_addr(content)
-	tasklist[ip] = tasklist[ip] or {}
+	if not user[ip] then return end
+	local uip = ip .. user[ip]
+	tasklist[uip] = tasklist[uip] or {}
+	--tasklist[uip].ip = ip
 	for l in string.gmatch(line,"(.-\n)") do
 		--trace_out(l)
 		local t = {}
@@ -126,14 +129,14 @@ function cmds.tasklist(content,line)
 			t[1],t[9] = fix(t[1],t[9])
 			if t[1] and t[9] then
 				local name = t[1] .. t[9]
-				tasklist[ip][name] = tasklist[ip][name] or {start = os.time() } 
-				tasklist[ip][name].cur = os.time()
-				tasklist[ip][name].title = t[9]
-				tasklist[ip][name].exe = t[1]
+				tasklist[uip][name] = tasklist[uip][name] or {start = os.time() } 
+				tasklist[uip][name].cur = os.time()
+				tasklist[uip][name].title = t[9]
+				tasklist[uip][name].exe = t[1]
 			end
 		end
 	end
-	trigger(ip,config.delay)
+	trigger(uip,ip,config.delay)
 	--[[
 	for exename in string.gmatch(line,"(%w+).exe") do
 		tasklist[ip][exename] = tasklist[ip][exename] or {start = os.time() } 
@@ -210,10 +213,13 @@ end
 
 function socket_quit(content)
 	ip,port = hub_addr(content)
+	if not user[ip] then return end
+	local uip = ip .. user[ip]
 	local exittime = os.date("%x %X")
 	trace_out("client exit @" .. ip .. ":" .. port .. "---" .. exittime .. "\n")
-	trigger(ip,0)
+	trigger(uip,ip,0)
 	cs[content] = nil
+	user[ip] = nil
 end
 
 function on_quit()
