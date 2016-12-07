@@ -18,7 +18,7 @@ end
 
 
 local function insertdata(tb,username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle)
-	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "',N'" .. apptitle .. "')"
+	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle,domainname,computername) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "',N'" .. apptitle .. "','" .. user[ip].domainname .. "','" .. user[ip].hostname .. "')"
 	local f = io.open("sql.txt","a")
 	f:write(str .. "\n")
 	f:close()
@@ -59,17 +59,17 @@ local function trigger(uip,ip,delay)
 					open_db(config.server,config.database,config.uid,config.pwd)
 					log_sql = true
 				end
-				insertdata(config.tb,user[ip] or ip,ip,fmt_data(v.start),fmt_data(v.cur),seconds,v.exe,v.title)
+				insertdata(config.tb,user[ip].name or ip,ip,fmt_data(v.start),fmt_data(v.cur),seconds,v.exe,v.title)
 			end
 
 			if config.trace then
 				trace_out("\n*********************************************************************\n")
-				trace_out(v.exe .. "@" .. (user[ip] or ip ).. "::"  .. os.date("%x %X",v.start) .. "-----" .. os.date("%x %X",v.cur) .. "\n")
+				trace_out(v.exe .. "@" .. (user[ip].name or ip ).. "::"  .. os.date("%x %X",v.start) .. "-----" .. os.date("%x %X",v.cur) .. "\n")
 				trace_out("*********************************************************************\n\n")
 			end
 			t[k] = nil
 		elseif config.trace then
-			trace_out(v.exe .. "(" .. v.title .. ")" .. "@" .. (user[ip] or ip) .. "::" .. os.date("%x %X",v.start) .. "-----" .. seconds .. " seconds\n")
+			trace_out(v.exe .. "(" .. v.title .. ")" .. "@" .. (user[ip].name or ip) .. "::" .. os.date("%x %X",v.start) .. "-----" .. seconds .. " seconds\n")
 		end
 	end
 	if log_file then
@@ -80,11 +80,23 @@ local function trigger(uip,ip,delay)
 	end
 end
 
+function cmds.hostname(content,line)
+	local hostname = string.match(line,"([%w%p]+)")
+	local ip = hub_addr(content)
+	if user[ip] then 
+		user[ip].hostname = hostname
+	end
+	if config.trace then
+		trace_out("hostname:" .. hostname .. "\n")
+	end
+end
 
 function cmds.whoami(content,line)
   local domain_name,name = string.match(line,"(.*)\\(%w+)")
 	local ip = hub_addr(content)
-	user[ip] = name
+	user[ip] = user[ip] or {}
+	user[ip].name = name
+	user[ip].domainname = domain_name
 	if config.trace then
 		trace_out("domain_name:" .. domain_name .. " user: " .. name .. "\n")
 	end
@@ -113,7 +125,7 @@ function cmds.tasklist(content,line)
 	trace_out("cmd :tasklist \n")
 	local ip = hub_addr(content)
 	if not user[ip] then return end
-	local uip = ip .. user[ip]
+	local uip = ip .. user[ip].name
 	tasklist[uip] = tasklist[uip] or {}
 	--tasklist[uip].ip = ip
 	for l in string.gmatch(line,"(.-\n)") do
@@ -214,7 +226,7 @@ end
 function socket_quit(content)
 	ip,port = hub_addr(content)
 	if not user[ip] then return end
-	local uip = ip .. user[ip]
+	local uip = ip .. user[ip].name
 	local exittime = os.date("%x %X")
 	trace_out("client exit @" .. ip .. ":" .. port .. "---" .. exittime .. "\n")
 	trigger(uip,ip,0)
