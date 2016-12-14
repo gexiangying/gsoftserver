@@ -9,9 +9,10 @@ local M = {
 	tb = "[dbo].[gsoft]", -- sql server table name (username=ip,starttime,enddatetime,totaltimes,appname)
 	--tb = "test",
 	log_file = true,
-	log_sql = false, 
+	log_sql = true, 
+	hassql = false,
 	trace = true, 
-	delay = 6,
+	delay = 20,
 	ignore = {"lsass.exe","tasklist.exe","taskhost.exe","dwm.exe","gsoft.exe","dllhost.exe","smss.exe"},
 	titles = {"TeamViewer","SSDD","微信"},
 }

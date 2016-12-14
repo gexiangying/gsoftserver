@@ -6,6 +6,8 @@ local cs = {}
 local cmds = {}
 tasklist = {}
 local user = {}
+local domain = {}
+local hassql = config.hassql or true
 
 hub_start("localhost",config.port,10,60) --ip port max_accept max_accept_seconds
 local db
@@ -18,12 +20,14 @@ end
 
 
 local function insertdata(tb,username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle)
-	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle,domainname,computername) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "',N'" .. apptitle .. "','" .. user[ip].domainname .. "','" .. user[ip].hostname .. "')"
+	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle,domainname,computername) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "',N'" .. apptitle .. "','" .. domain[username].domainname .. "','" .. user[ip].hostname .. "')"
 	local f = io.open("sql.txt","a")
 	f:write(str .. "\n")
 	f:close()
 	str = luaext.a2u8(str)
-	db:exec(str)
+	if hassql then
+		db:exec(str)
+	end
 end
 
 local function fmt_data(datetime)
@@ -35,9 +39,8 @@ local function log(f,exename,ip,starttime,endtime,title)
 	f:write(exename .. "\t" .. title .. "\t" .. ip .. "\t" .. os.date("%Y-%m-%d %X",starttime) .. "\t" .. os.date("%Y-%m-%d %X",endtime) .. "\r\n")
 end
 
-local function trigger(uip,ip,delay)
+local function trigger_imp(ip,uname,t,delay)
 	local f 
-	local t = tasklist[uip] or {}
 
   local log_sql = false
 	local log_file = false
@@ -55,43 +58,48 @@ local function trigger(uip,ip,delay)
 			end
 
 			if config.log_sql then
-				if not log_sql then
+				if not log_sql and hassql then
 					open_db(config.server,config.database,config.uid,config.pwd)
 					log_sql = true
 				end
-				insertdata(config.tb,user[ip].name or ip,ip,fmt_data(v.start),fmt_data(v.cur),seconds,v.exe,v.title)
+				insertdata(config.tb,uname,ip,fmt_data(v.start),fmt_data(v.cur),seconds,v.exe,v.title)
 			end
 
 			if config.trace then
 				trace_out("\n*********************************************************************\n")
-				trace_out(v.exe .. "@" .. (user[ip].name or ip ).. "::"  .. os.date("%x %X",v.start) .. "-----" .. os.date("%x %X",v.cur) .. "\n")
+				trace_out(v.exe .. "@" .. uname .. "::"  .. os.date("%x %X",v.start) .. "-----" .. os.date("%x %X",v.cur) .. "\n")
 				trace_out("*********************************************************************\n\n")
 			end
 			t[k] = nil
 		elseif config.trace then
-			trace_out(v.exe .. "(" .. v.title .. ")" .. "@" .. (user[ip].name or ip) .. "::" .. os.date("%x %X",v.start) .. "-----" .. seconds .. " seconds\n")
+			trace_out(v.exe .. "(" .. v.title .. ")" .. "@" .. uname .. "::" .. os.date("%x %X",v.start) .. "-----" .. seconds .. " seconds\n")
 		end
 	end
 	if log_file then
 		f:close()
 	end
-	if log_sql then
+	if log_sql and hassql then
 		db:close()	
 	end
 end
-
+local function trigger(ip,delay)
+ for k,v in pairs(tasklist[ip]) do
+	 trigger_imp(ip,k,v,delay)
+	 --trace_out("trigger\tip:" .. ip .. "\tk:" .. k .. "\n")
+ end
+end
 function cmds.hostname(content,line)
 	local hostname = string.match(line,"([%w%p]+)")
 	local ip = hub_addr(content)
-	if user[ip] then 
-		user[ip].hostname = hostname
-	end
+	user[ip] = user[ip] or {}
+	user[ip].hostname = hostname
 	if config.trace then
 		trace_out("hostname:" .. hostname .. "\n")
 	end
 end
 
 function cmds.whoami(content,line)
+	--[[
   local domain_name,name = string.match(line,"(.*)\\(%w+)")
 	local ip = hub_addr(content)
 	user[ip] = user[ip] or {}
@@ -100,6 +108,7 @@ function cmds.whoami(content,line)
 	if config.trace then
 		trace_out("domain_name:" .. domain_name .. " user: " .. name .. "\n")
 	end
+	--]]
 end
 
 function cmds.systeminfo(content,line)
@@ -121,13 +130,22 @@ function fix(t1,t9)
   return t1,t9
 end
 
+function process_user(username)
+	local domainname,name = string.match(username,"(.*)\\(.*)")
+	if domainname and name then
+		 domain[name] = domain[name] or {}
+		 domain[name].domainname = domainname
+		 --trace_out("process_user:" .. "\t" .. domainname .. "\t" .. name .. "\n")
+		 return name 
+  end
+	return nil
+end
+
 function cmds.tasklist(content,line)
 	trace_out("cmd :tasklist \n")
 	local ip = hub_addr(content)
 	if not user[ip] then return end
-	local uip = ip .. user[ip].name
-	tasklist[uip] = tasklist[uip] or {}
-	--tasklist[uip].ip = ip
+	tasklist[ip] = tasklist[ip] or {}
 	for l in string.gmatch(line,"(.-\n)") do
 		--trace_out(l)
 		local t = {}
@@ -141,14 +159,19 @@ function cmds.tasklist(content,line)
 			t[1],t[9] = fix(t[1],t[9])
 			if t[1] and t[9] then
 				local name = t[1] .. t[9]
-				tasklist[uip][name] = tasklist[uip][name] or {start = os.time() } 
-				tasklist[uip][name].cur = os.time()
-				tasklist[uip][name].title = t[9]
-				tasklist[uip][name].exe = t[1]
+				local uname = process_user(t[7])
+				if uname then
+					--trace_out("uanme:" .. uname .. "\tname:" .. name .. "\n")
+					tasklist[ip][uname] = tasklist[ip][uname] or {}
+					tasklist[ip][uname][name] = tasklist[ip][uname][name] or {start=os.time()} 
+					tasklist[ip][uname][name].cur = os.time()
+					tasklist[ip][uname][name].title = t[9]
+					tasklist[ip][uname][name].exe = t[1]
+				end
 			end
 		end
 	end
-	trigger(uip,ip,config.delay)
+	trigger(ip,config.delay)
 	--[[
 	for exename in string.gmatch(line,"(%w+).exe") do
 		tasklist[ip][exename] = tasklist[ip][exename] or {start = os.time() } 
@@ -225,13 +248,13 @@ end
 
 function socket_quit(content)
 	ip,port = hub_addr(content)
-	if not user[ip] then return end
-	local uip = ip .. user[ip].name
 	local exittime = os.date("%x %X")
 	trace_out("client exit @" .. ip .. ":" .. port .. "---" .. exittime .. "\n")
-	trigger(uip,ip,0)
+	if not user[ip] then return end
+	trigger(ip,0)
 	cs[content] = nil
 	user[ip] = nil
+	tasklist[ip] = nil
 end
 
 function on_quit()
