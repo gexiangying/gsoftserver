@@ -9,6 +9,7 @@ local user = {}
 local domain = {}
 local hassql = not config.nosql 
 
+os.execute("mkdir " .. "log")
 hub_start("localhost",config.port,10,60) --ip port max_accept max_accept_seconds
 local db
 local function open_db(server,database,uid,pwd)
