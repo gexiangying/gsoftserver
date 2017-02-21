@@ -7,7 +7,7 @@ local cmds = {}
 tasklist = {}
 local user = {}
 local domain = {}
-local hassql = config.hassql or true
+local hassql = not config.nosql 
 
 hub_start("localhost",config.port,10,60) --ip port max_accept max_accept_seconds
 local db
@@ -21,7 +21,8 @@ end
 
 local function insertdata(tb,username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle)
 	local str = "INSERT INTO " .. tb  .. "(username,ip,startdatetime,enddatetime,totaltimes,appname,apptitle,domainname,computername) VALUES ('" .. username .. "','" .. ip .. "','" .. startdatetime .. "','" .. enddatetime .. "','"  .. totaltimes .. "','" .. appname .. "',N'" .. apptitle .. "','" .. domain[username].domainname .. "','" .. user[ip].hostname .. "')"
-	local f = io.open("sql.txt","a")
+	local sql_log_name = os.date("log/%Y-%m-%d-sql.txt")
+	local f = io.open(sql_log_name,"a")
 	f:write(str .. "\n")
 	f:close()
 	str = luaext.a2u8(str)
@@ -44,14 +45,14 @@ local function trigger_imp(ip,uname,t,delay)
 
   local log_sql = false
 	local log_file = false
-
+  local log_file_name = os.date("log/%Y-%m-%d-log.txt")
 	for k,v in pairs(t) do
 		local seconds = v.cur - v.start
 		local period = os.time() - v.cur
 		if period > delay then
 			if config.log_file then
 				if not log_file or not f then
-					f = io.open("log.txt","a")
+					f = io.open(log_file_name,"a")
 					log_file = true
 				end
 				log(f,v.exe,ip,v.start,v.cur,v.title)
