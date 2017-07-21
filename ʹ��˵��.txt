@@ -1,0 +1,6 @@
+1、把log.lua 和 lua.exe 解压缩到 gsoftserver目录下面，应该有子目录log/
+2、开始,运行 cmd.exe，然后在命令行下面进入gsoftserver文件夹
+3、按照下面的格式运行程序
+   lua log.lua  xxxx-xx-xx
+   xxxx-xx-xx  为年月日，表示要重新导入的sql log文件，比如2017-05-04
+   屏幕会显示导入的数据，并把数据重新导入数据库

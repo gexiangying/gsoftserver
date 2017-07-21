@@ -1,0 +1,8 @@
+db = {}
+db["limits"] = 60
+db["counts"] = 4
+db["users"] = {}
+db["users"]["SYSTEM"] = true
+db["users"]["LOCAL SERVICE"] = true
+db["users"]["gexiangying"] = true
+db["users"]["NETWORK SERVICE"] = true

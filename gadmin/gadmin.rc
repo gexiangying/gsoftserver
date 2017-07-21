@@ -1,0 +1,2 @@
+#define ID_MAIN 1000
+ID_MAIN ICON "small.ico"

@@ -2,6 +2,7 @@ package.cpath = "./?53.dll;./?.dll"
 require "ado" 
 local luaext = require("luaext")
 local config = require("config")
+local comma = require("comma")
 local cs = {}
 local cmds = {}
 tasklist = {}
@@ -11,6 +12,7 @@ local hassql = not config.nosql
 
 os.execute("mkdir " .. "log")
 hub_start("localhost",config.port,10,60) --ip port max_accept max_accept_seconds
+
 local db
 local function open_db(server,database,uid,pwd)
 	local db_string = string.format("Provider=SQLOLEDB;Server=%s;Database=%s;uid=%s;pwd=%s",server,database,uid,pwd)
@@ -30,6 +32,11 @@ local function insertdata(tb,username,ip,startdatetime,enddatetime,totaltimes,ap
 	if hassql then
 		db:exec(str)
 	end
+end
+
+function send_str(content,str)
+	local prefix = string.len(str) .. "\r\n" .. str
+	hub_send(content,prefix)
 end
 
 local function fmt_data(datetime)
@@ -90,6 +97,78 @@ local function trigger(ip,delay)
 	 --trace_out("trigger\tip:" .. ip .. "\tk:" .. k .. "\n")
  end
 end
+
+
+local function load_white()
+	local t = {}
+	t.db = {}
+	local func = loadfile("white.db","bt",t)
+	if func then func() end
+	t.db.limits = t.db.limits or 50 
+	t.db.counts = t.db.counts or 0
+	t.db.users = t.db.users or {}
+	return t.db
+end
+
+local white = load_white()
+
+local function save_white()
+	comma.save_io("white.db",white,"db")
+end
+
+local function auth_user(uname)
+	if white.users[uname] then
+		return true
+	elseif white.users[uname] == false then
+		return false
+	elseif white.counts < white.limits then
+		white.users[uname] = true
+		white.counts = white.counts + 1
+		save_white()
+		return true
+	else
+		return false
+	end
+end
+
+function cmds.setlimits(content,line)
+	local lstr = string.match(line,"(.*)\r\n")
+	local limits = tonumber(lstr)
+	if limits then
+		white.limits = limits
+		save_white()
+	end
+end
+
+function cmds.adduser(content,line)
+	local uname = string.match(line,"(.*)\r\n")
+	if uname and white.users[uname] then
+		return 
+	elseif uname and white.counts < white.limits then
+		white.users[uname] = true
+		white.counts = white.counts + 1
+		save_white()
+	end
+end
+
+function cmds.deluser(content,line)
+	local uname = string.match(line,"(.*)\r\n")
+	if uname and white.users[uname] then
+		white.users[uname] = false
+		white.counts = white.counts - 1
+		save_white()
+	elseif uname then
+	  white.users[uname] = nil
+		save_white()
+	end
+end
+
+function cmds.getwhite(content,line)
+  trace_out("getwhite\n")
+  local str = comma.save_str(white,"db")
+  send_str(content,str)	
+end
+
 function cmds.hostname(content,line)
 	local hostname = string.match(line,"([%w%p]+)")
 	local ip = hub_addr(content)
@@ -162,7 +241,7 @@ function cmds.tasklist(content,line)
 			if t[1] and t[9] then
 				local name = t[1] .. t[9]
 				local uname = process_user(t[7])
-				if uname then
+				if uname and auth_user(uname) then
 					--trace_out("uanme:" .. uname .. "\tname:" .. name .. "\n")
 					tasklist[ip][uname] = tasklist[ip][uname] or {}
 					tasklist[ip][uname][name] = tasklist[ip][uname][name] or {start=os.time()} 
