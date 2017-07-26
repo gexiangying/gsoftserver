@@ -8,6 +8,8 @@ local string = string
 local tonumber = tonumber
 local load = load
 local tree = tree
+local loadfile = loadfile
+local comma = require("comma")
 _ENV = M
 
 local ip 
@@ -33,14 +35,27 @@ function farse_recv(ct,t)
 	if func then func() end
 end
 
+local function load_config()
+	local t = {}
+	t.db = {}
+	local func = loadfile("config.db","bt",t)
+	if func then func() end
+	t.db.ip = t.db.ip or "127.0.0.1"
+	t.db.port = t.db.port or 25
+	return t.db
+end
+local function save_config(db)
+	comma.save_io("config.db",db,"db")
+end
 function set()
- local status
- local iptemp = ip or "127.0.0.1"
- local porttemp = port or 25
- status,iptemp,porttemp = iup.GetParam("set",nil,"ip %s\nport %i\n",iptemp,porttemp) 
+ local db = load_config()
+ local status,iptemp,porttemp = iup.GetParam("set",nil,"ip %s\nport %i\n",db.ip,db.port) 
  if status then
 	 ip = iptemp
 	 port = porttemp
+	 db.ip = ip
+	 db.port = port
+	 save_config(db)
  end
 end
 
@@ -79,7 +94,7 @@ end
 
 function link_menu(menu)
 	menu.item_refresh.action = refresh
-	menu.item_limits.action = limits
+	--menu.item_limits.action = limits
 	menu.item_set.action = set
 end
 

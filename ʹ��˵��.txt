@@ -1,6 +1,5 @@
-1、把log.lua 和 lua.exe 解压缩到 gsoftserver目录下面，应该有子目录log/
-2、开始,运行 cmd.exe，然后在命令行下面进入gsoftserver文件夹
-3、按照下面的格式运行程序
-   lua log.lua  xxxx-xx-xx
-   xxxx-xx-xx  为年月日，表示要重新导入的sql log文件，比如2017-05-04
-   屏幕会显示导入的数据，并把数据重新导入数据库
+﻿1、gsoftserver.zip 解压缩 main.lua 覆盖到gsoftserver 目录下面
+2、gadmin.zip 解压缩到某一个管理者机器，需要64位系统，运行gadmin.exe，点击管理菜单先设置gsoftserver服务器的ip和port,然后点刷新，将会得到服务器的节点数设置和黑白名单；
+3、点设置节点数,可以设置server收集节点数目
+4、在左面的黑白名单列表，双击用户名称可以从名单删除，白名单删除自动添加到黑名单，黑名单删除后，如果没达到上限，下次该用户登录将会自动进入白名单。
+附件设计目标除客户端未做修改，服务器端功能全部实现。
