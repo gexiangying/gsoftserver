@@ -1,8 +1,8 @@
 CC = $(BIN)gcc 
 PRJ =	gadmin
-INCPATH = -I/usr/include
-LIBPATH = -L/usr/lib
-LIBS = -llua
+INCPATH = -I/usr/local/include
+LIBPATH = -L/usr/local/lib
+LIBS = -llua53 -ltrace
 LDFLAGS = -mwindows
 SRCS :=$(wildcard *.c)
 HPPS :=$(wildcard *.h)

@@ -94,7 +94,7 @@ end
 
 function link_menu(menu)
 	menu.item_refresh.action = refresh
-	--menu.item_limits.action = limits
+	menu.item_limits.action = limits
 	menu.item_set.action = set
 end
 

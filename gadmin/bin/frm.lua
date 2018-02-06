@@ -7,22 +7,19 @@ _ENV = M
 
 function get_main(MDIMenu,t)
 	local sp = iup.split {
-		VALUE = '200',
+		VALUE = 200,
 		AUTOHIDE = "YES",
-		iup.vbox {
-			iup.frame { t, NULL }
-		},
-		iup.vbox {
-			iup.canvas { 
+		iup.frame {t},
+		iup.canvas { 
 				EXPAND = 'YES', 
 				MDICLIENT = 'YES',
 				SHRINK="YES",	  
-				--     BGCOLOR = '128 128 128' 
-				--MDIMENU = MDIMenu
 			}
-
-		}
 	}
+	function sp:valuechanged_cb()
+		--iup.Redraw(self,1)
+		iup.UpdateChildren(self)
+	end
 	local MainForm = iup.dialog{
 		menu = MDIMenu,
 		TITLE = "GsoftAdmin",
@@ -32,10 +29,13 @@ function get_main(MDIMenu,t)
 		ICON="SMALL.ICO",
 
 		iup.vbox {
+			--[[
 			iup.hbox {
 				sp,
 			},
-			NULL, 
+			--]]
+			sp,
+			NULL 
 		},
 	}
 
@@ -56,20 +56,23 @@ function get_main(MDIMenu,t)
 	return MainForm,sp
 end
 
-function get_child(mat)
+function get_child(main,content)
 	local MDI1Form = iup.dialog{
 		TITLE = 'MDI1',
 		MDICHILD = 'YES',
-		PARENTDIALOG = MainForm,
+		PARENTDIALOG = main,
 		PLACEMENT = "FULL",
 		RESIZE = "YES",
+		--SIZE = '200X150',
 		ICON="SMALL.ICO",
 		CONTROL="YES",
 		SHRINK="YES",
 		EXPAND="YES",
-		iup.vbox{mat,EXPAND="YES",SHRINK="YES"}
+		iup.vbox{
+			content,EXPAND = 'YES',SHRINK = 'YES'
+		}
 	}
-	MDI1Form:map()
+--	MDI1Form:map()
 	return MDI1Form;
 end
 
